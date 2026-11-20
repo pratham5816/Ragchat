@@ -21,34 +21,6 @@ const SAMPLE_QUESTIONS = [
   },
 ]
 
-// Fallback grounded knowledge if backend Spring Boot service is offline
-const MOCK_KNOWLEDGE = {
-  devprofile: `**DevProfile AI** is an end-to-end Retrieval-Augmented Generation (RAG) assistant built from scratch with:
-- **Backend**: Java 21, Spring Boot REST architecture, custom \`RestClient\`
-- **Vector Database**: Qdrant Cloud storing dense vector points (Cosine distance)
-- **Embeddings**: Ollama with \`nomic-embed-text\` generating 768-dimensional embeddings
-- **Inference**: Cohere v2 Chat API (\`command-a-plus-05-2026\`) with strict prompt grounding
-- **Data Ingestion**: Apache Commons CSV parsing 147 day-level engineering logs
-- **Key Achievement**: Resolved AWS ALB TLS 1.3 socket desynchronization by tuning Spring RestClient with custom HTTP/1.1 transport and batch-throttled vector upserts.`,
-
-  skills: `**Core Technical Expertise:**
-- **Languages & Frameworks**: Java 21, Spring Boot 3.x, Spring Data, RestClient, React.js
-- **Vector Databases & RAG**: Qdrant Cloud, Ollama, Cohere API, Dense Semantic Search, Cosine Similarity
-- **Architecture**: Microservices, RESTful APIs, Distributed Systems, Zero-SQL Semantic Retrieval
-- **Tools & DevOps**: Docker, Git, Maven, Apache Commons CSV, MySQL, AWS ALB networking`,
-
-  tracker: `**Browser-Based Vehicle Tracker** (Full-Stack Capstone Project):
-- **Stack**: Java, Spring Boot microservices, React.js, Leaflet / OpenStreetMap, MySQL
-- **Features**: Real-time vehicle telemetry ingestion, spatial coordinate indexing, and interactive browser mapping.
-- **Architecture**: Decoupled REST services with high-throughput ingestion and sub-second spatial querying.`,
-
-  education: `**Educational Qualifications:**
-- **Post Graduate Diploma in Advanced Computing (PG-DAC)**: Centre for Development of Advanced Computing (C-DAC) (Aug 2025 – Jan 2026).
-  * Focus: Advanced Java, Spring Boot, Microservices, Distributed Systems, Docker, and DevOps.
-- **Bachelor of Technology (B.Tech)**: Computer Science & Engineering.
-  * Focus: Data Structures & Algorithms, Operating Systems, DBMS, Object-Oriented Design, and System Architecture.`
-}
-
 // Lightweight, safe markdown formatter for responses
 function renderFormattedMessage(content) {
   if (!content) return null
@@ -175,6 +147,19 @@ function getFormattedTime() {
 const API_TIMEOUT_SECONDS = 60
 const API_TIMEOUT_MS = API_TIMEOUT_SECONDS * 1000
 
+// In production, reads VITE_API_BASE_URL (e.g. https://api.yourdomain.com).
+// In local dev, defaults to "" so Vite's proxy forwards requests to http://127.0.0.1:8080.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+const API_KEY = import.meta.env.VITE_API_KEY || ''
+
+// Simple, user-friendly error strings for visitors
+function getUserFriendlyError(status) {
+  if (status === 429) {
+    return 'Daily limit reached. Please try again later.'
+  }
+  return 'Something went wrong. Please try again later.'
+}
+
 function App() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -255,14 +240,18 @@ function App() {
       controller.abort(new DOMException('TIMEOUT', 'AbortError'))
     }, API_TIMEOUT_MS)
 
+    const endpoint = `${API_BASE_URL}/chat/cohere/rag/v1`
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+    }
+    if (API_KEY) {
+      requestHeaders['X-API-KEY'] = API_KEY
+    }
+
     try {
-      
-      const response = await fetch('/chat/cohere/rag/v1', {
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-KEY':import.meta.env.VITE_API_KEY
-        },
+        headers: requestHeaders,
         body: JSON.stringify({
           messages: [{ role: 'user', content: query }],
           stream: false,
@@ -273,7 +262,9 @@ function App() {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}`)
+        const err = new Error(getUserFriendlyError(response.status))
+        err.status = response.status
+        throw err
       }
 
       const rawText = await response.text()
@@ -311,9 +302,10 @@ function App() {
       const isTimeout = err.name === 'AbortError' || controller.signal.aborted
 
       if (isTimeout) {
+        const timeoutMsg = 'The request took too long to respond. Please try again later.'
         setBackendNotice({
           type: 'timeout',
-          text: `⏱️ Request Timed Out (60s): The API did not respond within ${API_TIMEOUT_SECONDS} seconds.`,
+          text: timeoutMsg,
         })
 
         setMessages((prev) => [
@@ -322,31 +314,18 @@ function App() {
             id: botMessageId,
             role: 'assistant',
             isTimeout: true,
-            content: `⏱️ **Request Timed Out (${API_TIMEOUT_SECONDS} seconds)**\n\nYou can click **Retry Request** below to try sending this prompt again.`,
+            content: timeoutMsg,
             queryToRetry: query,
             timestamp: getFormattedTime(),
           },
         ])
-      } else {
-        // Fallback: If Spring Boot is offline, provide helpful notification and ground response
-        let fallbackText = ''
-        const lower = query.toLowerCase()
-
-        if (lower.includes('devprofile') || lower.includes('rag') || lower.includes('pipeline')) {
-          fallbackText = MOCK_KNOWLEDGE.devprofile
-        } else if (lower.includes('skill') || lower.includes('stack') || lower.includes('java') || lower.includes('spring')) {
-          fallbackText = MOCK_KNOWLEDGE.skills
-        } else if (lower.includes('vehicle') || lower.includes('tracker')) {
-          fallbackText = MOCK_KNOWLEDGE.tracker
-        } else if (lower.includes('education') || lower.includes('degree') || lower.includes('cdac') || lower.includes('pg-dac')) {
-          fallbackText = MOCK_KNOWLEDGE.education
-        } else {
-          fallbackText = `I am currently operating in preview mode while the backend is starting up. \n\nHere is what I can answer from Pratham's RAG knowledge base:\n- **DevProfile AI Architecture**: Qdrant Cloud + Ollama + Cohere\n- **Core Engineering Skills**: Java 21, Spring Boot, Microservices, RAG\n- **Vehicle Tracker Capstone Project**: Real-time telemetry ingestion\n- **Education**: CDAC PG-DAC & B.Tech CSE`
-        }
+      } else if (err.status) {
+        const friendlyMessage = getUserFriendlyError(err.status)
 
         setBackendNotice({
-          type: 'offline',
-          text: 'Spring Boot backend is currently offline. Showing local indexed portfolio preview.',
+          type: 'error',
+          status: err.status,
+          text: friendlyMessage,
         })
 
         setMessages((prev) => [
@@ -354,8 +333,30 @@ function App() {
           {
             id: botMessageId,
             role: 'assistant',
-            content: fallbackText,
-            grounded: true,
+            isError: true,
+            errorStatus: err.status,
+            content: friendlyMessage,
+            queryToRetry: query,
+            grounded: false,
+            timestamp: getFormattedTime(),
+          },
+        ])
+      } else {
+        const friendlyMessage = 'Something went wrong. Please try again later.'
+        setBackendNotice({
+          type: 'error',
+          text: friendlyMessage,
+        })
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: botMessageId,
+            role: 'assistant',
+            isError: true,
+            content: friendlyMessage,
+            queryToRetry: query,
+            grounded: false,
             timestamp: getFormattedTime(),
           },
         ])
@@ -396,14 +397,14 @@ function App() {
         </div>
 
         <div className="header-right">
-          <div className="status-badge" title="Vector DB: Qdrant Cloud | Model: Cohere Command R+">
-            <span className={`status-dot ${backendNotice?.type === 'timeout' ? 'timeout' : backendNotice ? 'offline' : ''}`}></span>
+          <div className="status-badge" title="Assistant Status">
+            <span className={`status-dot ${backendNotice?.type === 'timeout' || backendNotice?.type === 'error' ? 'timeout' : ''}`}></span>
             <span>
               {backendNotice?.type === 'timeout'
-                ? 'Timeout (60s)'
-                : backendNotice
-                ? 'Preview Mode'
-                : 'Grounded'}
+                ? 'Unavailable'
+                : backendNotice?.type === 'error'
+                ? (backendNotice.status === 429 ? 'Daily Limit' : 'Unavailable')
+                : 'Ready'}
             </span>
           </div>
 
@@ -469,18 +470,29 @@ function App() {
               )}
 
               <div className="message-bubble-wrapper">
-                <div className={`message-bubble ${msg.role === 'user' ? 'user-bubble' : 'bot-bubble'} ${msg.isTimeout ? 'timeout-bubble' : ''}`}>
+                <div className={`message-bubble ${msg.role === 'user' ? 'user-bubble' : 'bot-bubble'} ${msg.isTimeout ? 'timeout-bubble' : ''} ${msg.isError ? 'error-bubble' : ''}`}>
                   {msg.role === 'assistant' && msg.isTimeout && (
                     <div className="rag-grounding-tag timeout-tag">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <polyline points="12 6 12 12 16 14"></polyline>
                       </svg>
-                      <span>Request Timeout (60s)</span>
+                      <span>Timeout</span>
                     </div>
                   )}
 
-                  {msg.role === 'assistant' && !msg.isTimeout && (
+                  {msg.role === 'assistant' && msg.isError && (
+                    <div className="rag-grounding-tag error-tag">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <span>{msg.errorStatus === 429 ? 'Daily Limit' : 'Notice'}</span>
+                    </div>
+                  )}
+
+                  {msg.role === 'assistant' && !msg.isTimeout && !msg.isError && (
                     <div className="rag-grounding-tag">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
@@ -495,7 +507,7 @@ function App() {
                     msg.content
                   )}
 
-                  {msg.isTimeout && msg.queryToRetry && (
+                  {(msg.isTimeout || msg.isError) && msg.queryToRetry && (
                     <div>
                       <button
                         className="retry-btn"

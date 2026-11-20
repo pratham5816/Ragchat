@@ -382,17 +382,20 @@
   margin-bottom: 8px;
 }
 
-.rag-grounding-tag.timeout-tag {
+.rag-grounding-tag.timeout-tag,
+.rag-grounding-tag.error-tag {
   background-color: #fff1f2;
   border-color: #fecdd3;
   color: #be123c;
 }
 
-.rag-grounding-tag.timeout-tag svg {
+.rag-grounding-tag.timeout-tag svg,
+.rag-grounding-tag.error-tag svg {
   color: #e11d48;
 }
 
-.message-bubble.timeout-bubble {
+.message-bubble.timeout-bubble,
+.message-bubble.error-bubble {
   border-color: #fecdd3;
   background-color: #ffffff;
 }
