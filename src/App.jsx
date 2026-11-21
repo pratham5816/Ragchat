@@ -4,22 +4,61 @@ import './App.css'
 // Preset questions grounded in Pratham's indexed knowledge base
 const SAMPLE_QUESTIONS = [
   {
-    topic: 'Flagship Project',
-    text: 'How does DevProfile AI RAG pipeline work?',
+    topic: 'Flagship RAG',
+    text: 'How does DevProfile AI RAG pipeline and Qdrant vector search work?',
   },
   {
-    topic: 'Backend & Stack',
-    text: 'What is your core expertise in Java & Spring Boot?',
+    topic: 'API Reverse Eng',
+    text: 'How did you build the EatClub queue bypass and Twilio alert system?',
   },
   {
-    topic: 'Distributed Systems',
-    text: 'Tell me about the Vehicle Tracker capstone project.',
+    topic: 'Fleet Systems',
+    text: 'Tell me about the browser-based Vehicle Tracker capstone project.',
   },
   {
-    topic: 'Background',
-    text: 'Summarize your education & CDAC PG-DAC credentials.',
+    topic: 'Autonomous AI',
+    text: 'How does the multi-model GitHub and Google Chat agent work?',
+  },
+  {
+    topic: 'IoT & Mobile',
+    text: 'How does BeaconBLE control smart lighting offline without cloud delay?',
+  },
+  {
+    topic: 'Enterprise OMS',
+    text: 'What Apache NiFi and HotWax OMS integration pipelines did you build?',
+  },
+  {
+    topic: 'Security & VAPT',
+    text: 'How did you fix Server-Side Template Injection (SSTI) and VAPT vulnerabilities in Apache OFBiz?',
+  },
+  {
+    topic: 'Education & Stack',
+    text: 'Summarize your education, C-DAC PG-DAC credentials, and core tech stack.',
   },
 ]
+
+// Keywords extracted directly from CV & verified production logs
+const CV_KEYWORDS = [
+  'Apache NiFi',
+  'Qdrant Vector DB',
+  'FreeMarker SSTI',
+  'VAPT Fixes',
+  'Shopify Integration',
+  'Spring Boot',
+  'AWS SQS',
+  'LangChain & Agents',
+  'Apache Moqui & OFBiz',
+  'Grafana & JWT Telemetry',
+  'PredictSpring POS',
+  'FastAPI & Python',
+  'RAG Pipeline',
+  'PG-DAC',
+  'Coding Ninjas Rank 1',
+]
+
+// Universal template to turn one keyword at a time into a grounded question
+const generateKeywordQuestion = (keyword) =>
+  `What is Pratham's hands-on experience and work with ${keyword}?`
 
 // Lightweight, safe markdown formatter for responses
 function renderFormattedMessage(content) {
@@ -147,9 +186,8 @@ function getFormattedTime() {
 const API_TIMEOUT_SECONDS = 60
 const API_TIMEOUT_MS = API_TIMEOUT_SECONDS * 1000
 
-// In production, reads VITE_API_BASE_URL (e.g. https://api.yourdomain.com).
-// In local dev, defaults to "" so Vite's proxy forwards requests to http://127.0.0.1:8080.
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+// Reads VITE_API_BASE_URL from .env, defaulting to http://localhost:8080 in local development
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/+$/, '')
 const API_KEY = import.meta.env.VITE_API_KEY || ''
 
 // Simple, user-friendly error strings for visitors
@@ -167,8 +205,22 @@ function App() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [backendNotice, setBackendNotice] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [selectedKeyword, setSelectedKeyword] = useState(null)
+  const [showAboutModal, setShowAboutModal] = useState(false)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
+
+  const handleKeywordSelect = (keyword) => {
+    if (isLoading) return
+    setSelectedKeyword(keyword)
+    const prompt = generateKeywordQuestion(keyword)
+    setInput(prompt)
+    if (textareaRef.current) {
+      textareaRef.current.focus()
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
+    }
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -208,6 +260,7 @@ function App() {
   const handleClearChat = () => {
     setMessages([])
     setBackendNotice(null)
+    setSelectedKeyword(null)
   }
 
   const handleSend = async (customPrompt) => {
@@ -392,11 +445,52 @@ function App() {
                 RAG
               </span>
             </div>
-            <span className="brand-subtitle">Grounded Knowledge Assistant • Pratham</span>
+            <span className="brand-subtitle">Grounded Knowledge Assistant • Pratham Kumar Taheem</span>
           </div>
         </div>
 
         <div className="header-right">
+          <a
+            href="https://github.com/pratham5816"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-social-btn"
+            title="GitHub (pratham5816)"
+            aria-label="GitHub Profile"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            <span className="header-social-label">GitHub</span>
+          </a>
+
+          <a
+            href="https://linkedin.com/in/pratham-kumar-taheem"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-social-btn"
+            title="LinkedIn (pratham-kumar-taheem)"
+            aria-label="LinkedIn Profile"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            <span className="header-social-label">LinkedIn</span>
+          </a>
+
+          <button
+            className="about-header-btn"
+            onClick={() => setShowAboutModal(true)}
+            title="About this project"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>About</span>
+          </button>
+
           <div className="status-badge" title="Assistant Status">
             <span className={`status-dot ${backendNotice?.type === 'timeout' || backendNotice?.type === 'error' ? 'timeout' : ''}`}></span>
             <span>
@@ -433,10 +527,42 @@ function App() {
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
               </svg>
             </div>
-            <h1 className="empty-title">Pratham's Engineering Knowledge Base</h1>
-            <p className="empty-description">
-              Ask anything about technical projects, system architecture, Spring Boot microservices, or work history. All answers are strictly grounded in vector-indexed engineering logs.
-            </p>
+            <h1 className="empty-title">Pratham Kumar Taheem</h1>
+
+            {/* About This Project Card */}
+            <div className="about-project-card">
+              <div className="about-card-header">
+                <span className="about-card-badge">About this project</span>
+                <span className="about-author-name">Pratham Kumar Taheem</span>
+              </div>
+              <p className="about-card-text">
+                DevProfile AI is a conversational portfolio assistant. Instead of reading a static resume, you can ask questions about my experience, projects, skills and education, and get answers grounded in my own documented work. It was also built to explore how Retrieval-Augmented Generation (RAG) works end to end.
+              </p>
+              <div className="about-card-links">
+                <a
+                  href="https://github.com/pratham5816/DevProfile-AI-Powered-Portfolio"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="about-link-pill"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                  </svg>
+                  <span>github.com/pratham5816</span>
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/pratham-kumar-taheem-530a18280"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="about-link-pill"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                  </svg>
+                  <span>linkedin.com/in/pratham-kumar-taheem</span>
+                </a>
+              </div>
+            </div>
 
             <div className="empty-rag-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -447,12 +573,39 @@ function App() {
               <span>Indexed with Qdrant Cloud & Cohere Command R+</span>
             </div>
 
+            {/* Keyword Explorer */}
+            <div className="keywords-section">
+              <div className="section-label-row">
+                <span className="section-label">⚡ Explore by CV Keywords</span>
+                <span className="section-hint">Click a keyword to generate a grounded question</span>
+              </div>
+              <div className="keywords-cloud">
+                {CV_KEYWORDS.map((kw, idx) => (
+                  <button
+                    key={idx}
+                    className={`keyword-chip ${selectedKeyword === kw ? 'active' : ''}`}
+                    onClick={() => handleKeywordSelect(kw)}
+                    disabled={isLoading}
+                    title={`Generate question for ${kw}`}
+                  >
+                    <span className="keyword-chip-hash">#</span>
+                    <span className="keyword-chip-text">{kw}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="preset-section-divider">
+              <span className="preset-divider-text">Or choose a pre-asked question</span>
+            </div>
+
             <div className="suggestions-grid">
               {SAMPLE_QUESTIONS.map((q, idx) => (
                 <button
                   key={idx}
                   className="suggestion-card"
                   onClick={() => handleSend(q.text)}
+                  disabled={isLoading}
                 >
                   <span className="suggestion-topic">{q.topic}</span>
                   <span className="suggestion-text">{q.text}</span>
@@ -601,6 +754,25 @@ function App() {
 
       {/* Input Area */}
       <footer className="chat-input-area">
+        {messages.length > 0 && (
+          <div className="input-keywords-bar">
+            <span className="input-keywords-label">Keywords:</span>
+            <div className="input-keywords-scroll">
+              {CV_KEYWORDS.map((kw, idx) => (
+                <button
+                  key={idx}
+                  className={`mini-keyword-chip ${selectedKeyword === kw ? 'active' : ''}`}
+                  onClick={() => handleKeywordSelect(kw)}
+                  disabled={isLoading}
+                  title={`Generate question for ${kw}`}
+                >
+                  #{kw}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="input-box-wrapper">
           <textarea
             ref={textareaRef}
@@ -635,11 +807,108 @@ function App() {
             </svg>
             Grounded RAG: Responses strictly backed by indexed portfolio logs
           </span>
-          <span className="kbd-shortcut">
-            Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for newline
-          </span>
+          <div className="footer-links">
+            <a
+              href="https://github.com/pratham5816"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link"
+              title="Pratham's GitHub"
+            >
+              GitHub
+            </a>
+            <span className="footer-link-divider">•</span>
+            <a
+              href="https://linkedin.com/in/pratham-kumar-taheem"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link"
+              title="Pratham's LinkedIn"
+            >
+              LinkedIn
+            </a>
+          </div>
         </div>
       </footer>
+
+      {/* About Project Modal */}
+      {showAboutModal && (
+        <div className="modal-backdrop" onClick={() => setShowAboutModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <div className="brand-icon modal-icon">
+                  <span>DP</span>
+                </div>
+                <div>
+                  <h3 className="modal-title">About this project</h3>
+                  <span className="modal-author">Pratham Kumar Taheem • AI & Backend Engineer</span>
+                </div>
+              </div>
+              <button
+                className="icon-btn modal-close-btn"
+                onClick={() => setShowAboutModal(false)}
+                aria-label="Close modal"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="modal-description">
+                DevProfile AI is a conversational portfolio assistant. Instead of reading a static resume, you can ask questions about my experience, projects, skills and education, and get answers grounded in my own documented work. It was also built to explore how Retrieval-Augmented Generation (RAG) works end to end.
+              </p>
+
+              <div className="modal-tech-stack">
+                <span className="modal-stack-title">Core Architecture:</span>
+                <div className="modal-stack-tags">
+                  <span className="modal-tag">Java 21</span>
+                  <span className="modal-tag">Spring Boot 3</span>
+                  <span className="modal-tag">Qdrant Cloud (Vector DB)</span>
+                  <span className="modal-tag">Cohere Command R+</span>
+                  <span className="modal-tag">React 19 & Vite</span>
+                  <span className="modal-tag">Docker</span>
+                </div>
+              </div>
+
+              <div className="modal-links-row">
+                <a
+                  href="https://github.com/pratham5816"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="modal-social-btn"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                  </svg>
+                  <span>github.com/pratham5816</span>
+                </a>
+                <a
+                  href="https://linkedin.com/in/pratham-kumar-taheem"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="modal-social-btn"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                  </svg>
+                  <span>linkedin.com/in/pratham-kumar-taheem</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <span className="modal-footer-note">Candidate-first grounding & anti-hallucination guardrails.</span>
+              <button className="primary-btn" onClick={() => setShowAboutModal(false)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
